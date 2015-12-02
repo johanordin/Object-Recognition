@@ -1,4 +1,4 @@
-%% Import the file
+%% Import the files
 
 % data 10000x3072 array of uint8.
 % Each row in the array stores a 32x32 colour image.
@@ -6,21 +6,47 @@
 % The image is stored in row-major order, so that the first 32 entries are
 % the red channel values of the first row of the image.
 
-filename = 'data_batch_1.mat';
-load(strcat('cifar-10-batches-mat/', filename));
+% notice: the instances are transposed, so the data of one image is one col
+load(strcat('cifar-10-batches-mat/', 'data_batch_1.mat'));
+data1 = double(data);
+labels1 = double(labels);
+load(strcat('cifar-10-batches-mat/', 'data_batch_2.mat'));
+data2 = double(data);
+labels2 = double(labels);
+load(strcat('cifar-10-batches-mat/', 'data_batch_3.mat'));
+data3 = double(data);
+labels3 = double(labels);
+load(strcat('cifar-10-batches-mat/', 'data_batch_4.mat'));
+data4 = double(data);
+labels4 = double(labels);
+load(strcat('cifar-10-batches-mat/', 'data_batch_5.mat'));
+data5 = double(data);
+labels5 = double(labels);
+train_data = [data1; data2; data3; data4; data5]';
+train_labels = [labels1; labels2; labels3; labels4; labels5]'; 
 
-%% Create target matrix for the Matlab nprtool
-Targets=zeros(10, 10000);
+load(strcat('cifar-10-batches-mat/', 'test_batch.mat'));
+test_data = double(data');
+test_labels = double(labels');
 
-for i = 1:10000
-   j=labels(i)+1;
+
+%% Create target matrix for the training data for the Matlab nprtool
+Targets=zeros(10, size(train_data,2));
+
+for i = 1:size(train_data,2)
+   j=train_labels(i)+1;
    Targets(j, i)=1;
 end
+
+
+%% Preprocessing of the data 
+
+
 
 %% 
 
 % 
-inputs  = im2double(data');
+inputs  = double(train_data);
 targets = Targets;
 
 % Create a Pattern Recognition Network
