@@ -81,6 +81,10 @@ train_data_app=coeff(:,1:numb_comp)*train_data_red;
 
 %% 
 
+% close all plots windows
+close all
+clc
+
 % inputs  = double(train_data_tc);
 inputs  = train_data_app;
 targets = Targets;
@@ -95,7 +99,11 @@ net.divideParam.valRatio = 15/100;
 net.divideParam.testRatio = 15/100;
 
 % % Performance function
-net.performFcn = 'mse';
+%net.performFcn = 'mse';
+net.performFcn = 'crossentropy';
+% net.performFcn = 'sse'; %Sum squared error performance function
+%net.performFcn = 'sae';  %Sum absolute error performance function
+
 
 % % Transfer functions
 %net.layers{1}.transferFcn = 'tansig';
@@ -106,20 +114,21 @@ net.performFcn = 'mse';
 % % Train function 
 %net.trainFcn = 'trainrp';
 net.trainFcn = 'trainscg';
+%net.trainFcn = 'trainlm'; % Levenberg-Marquardt
 
 % % Train parameters trainscg
-net.trainParam.max_fail = 100;          % default 6
+net.trainParam.max_fail = 10;          % default 6
 %net.trainParam.min_grad = 1e-5;        % default 1e-6
-%net.trainParam.lambda=5.0e-7           % default 5.0e-7
-%net.trainParam.sigma=5.0e-5            % default 5.0e-5
-%net.trainParam.goal                    % default 0
+%net.trainParam.lambda=5.0e-7;           % default 5.0e-7
+%net.trainParam.sigma=5.0e-1;            % default 5.0e-5
+%net.trainParam.goal;                    % default 0
 
 % % Tran parameters trainrp
-%net.trainParam.lr=0.1                  % default 0.01
-%net.trainParam.delt_inc                % default 1.2
-%net.trainParam.delt_dec                % default 0.5
-%net.trainParam.delta0                  % default 0.07
-%net.trainParam.deltamax                % default 50
+%net.trainParam.lr=0.1;                         % default 0.01
+%net.trainParam.delt_inc=1.2;                 % default 1.2
+%net.trainParam.delt_dec=0.5;                 % default 0.5
+%net.trainParam.delta0=0.07;                  % default 0.07
+%net.trainParam.deltamax=50;                  % default 50
 
 % Initialize the network
 net = init(net);
@@ -131,13 +140,29 @@ net = init(net);
 outputs = trained_net(inputs);
 errors = gsubtract(targets, outputs);
 performance = perform(trained_net, targets,outputs);
-fprintf('Network performance: %f \n', performance)
+fprintf('Network performance  :%4.2f \n', performance)
 
 % View the Network
 view(net);
 
+% Print Percentage
+[ct, cmt] = confusion(targets(:,stats.testInd), outputs(:,stats.testInd));
+fprintf('Test  Correct Class  :%4.2f%%   \n'  , 100*(1-ct));
+%fprintf('Test  Incorrect Class:%4.2f%%   \n'  , 100*ct);
+
+[c, cm] = confusion(targets, outputs);
+fprintf('Total Correct Class  :%4.2f%%   \n'  , 100*(1-c));
+%fprintf('Total Incorrect Class:%4.2f%%   \n'  , 100*c);
+
 % Plot the confusion matrix
-figure; plotconfusion(targets, outputs)
+figure;plotconfusion(targets(:,stats.testInd),  outputs(:,stats.testInd),  'Test', ...
+                      targets, outputs, 'Total')
+
+% figure;plotconfusion(targets(:,stats.trainInd), outputs(:,stats.trainInd), 'Main', ...
+%               targets(:,stats.valInd),   outputs(:,stats.valInd),   'Validation', ...
+%               targets(:,stats.testInd),  outputs(:,stats.testInd),  'Test', ...
+%               targets, outputs, 'Total');
+
 
 % Plot the performance on linear scale
 figure;             % Create a new figure.
@@ -145,6 +170,9 @@ ax = axes;          % Get a handle to the figure's axes
 hold on;            % Set the figure to not overwrite old plots.
 grid on;            % Turn on the grid.
 plot(ax, stats.perf)
+
+% 
+classes = vec2ind(outputs);
 
 % Plots
 % Uncomment these lines to enable various plots.
