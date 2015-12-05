@@ -6,6 +6,9 @@
 % The image is stored in row-major order, so that the first 32 entries are
 % the red channel values of the first row of the image.
 
+clear all
+clc
+
 load(strcat('cifar-10-batches-mat/', 'data_batch_1.mat'));
 data1 = double(data);
 labels1 = double(labels);
@@ -22,8 +25,11 @@ load(strcat('cifar-10-batches-mat/', 'data_batch_5.mat'));
 data5 = double(data);
 labels5 = double(labels);
 %train_data = [data1; data2; data3; data4; data5];
+%train_labels = [labels1; labels2; labels3; labels4; labels5]; 
+
+%only use the first batch
 train_data=data1;
-train_labels = [labels1; labels2; labels3; labels4; labels5]; 
+train_labels = labels1; 
 
 % note: test data is transposed
 load(strcat('cifar-10-batches-mat/', 'test_batch.mat'));
@@ -60,7 +66,9 @@ while var_kept<0.99
     numb_comp=numb_comp+1;
     var_kept=sum(eigenvalues(1:numb_comp))/var_sum;
 end
-numb_comp
+
+fprintf('Number of components: %i \n', numb_comp)
+
 
 %% 
 % creating train_data_red as the reduced-dimension representation of the data
@@ -73,7 +81,8 @@ train_data_app=coeff(:,1:numb_comp)*train_data_red;
 
 %% 
 
-inputs  = double(train_data_tc);
+% inputs  = double(train_data_tc);
+inputs  = train_data_app;
 targets = Targets;
 
 % Create a Pattern Recognition Network
@@ -85,19 +94,57 @@ net.divideParam.trainRatio = 70/100;
 net.divideParam.valRatio = 15/100;
 net.divideParam.testRatio = 15/100;
 
-net.trainParam.max_fail=12;
-net.trainParam.min_grad=1e-7;
+% % Performance function
+net.performFcn = 'mse';
+
+% % Transfer functions
+%net.layers{1}.transferFcn = 'tansig';
+%net.layers{1}.transferFcn = 'logsig';
+%net.layers{2}.transferFcn = 'purelin';
+%net.layers{2}.transferFcn = 'softmax';
+
+% % Train function 
+%net.trainFcn = 'trainrp';
+net.trainFcn = 'trainscg';
+
+% % Train parameters trainscg
+net.trainParam.max_fail = 100;          % default 6
+%net.trainParam.min_grad = 1e-5;        % default 1e-6
+%net.trainParam.lambda=5.0e-7           % default 5.0e-7
+%net.trainParam.sigma=5.0e-5            % default 5.0e-5
+%net.trainParam.goal                    % default 0
+
+% % Tran parameters trainrp
+%net.trainParam.lr=0.1                  % default 0.01
+%net.trainParam.delt_inc                % default 1.2
+%net.trainParam.delt_dec                % default 0.5
+%net.trainParam.delta0                  % default 0.07
+%net.trainParam.deltamax                % default 50
+
+% Initialize the network
+net = init(net);
 
 % Train the Network
-[net,tr] = train(net, inputs, targets);
+[trained_net, stats] = train(net, inputs, targets);
 
 % Test the Network
-outputs = net(inputs);
-errors = gsubtract(targets,outputs);
-performance = perform(net,targets,outputs)
+outputs = trained_net(inputs);
+errors = gsubtract(targets, outputs);
+performance = perform(trained_net, targets,outputs);
+fprintf('Network performance: %f \n', performance)
 
 % View the Network
 view(net);
+
+% Plot the confusion matrix
+figure; plotconfusion(targets, outputs)
+
+% Plot the performance on linear scale
+figure;             % Create a new figure.
+ax = axes;          % Get a handle to the figure's axes
+hold on;            % Set the figure to not overwrite old plots.
+grid on;            % Turn on the grid.
+plot(ax, stats.perf)
 
 % Plots
 % Uncomment these lines to enable various plots.
