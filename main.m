@@ -29,7 +29,7 @@ labels5 = double(labels);
 
 %only use the first batch
 train_data=data1;
-train_labels = labels1; 
+train_labels=labels1; 
 
 % note: test data is transposed
 load(strcat('cifar-10-batches-mat/', 'test_batch.mat'));
@@ -44,7 +44,6 @@ for i = 1:size(train_data,1)
    j=train_labels(i)+1;
    Targets(j, i)=1;
 end
-
 
 %% Preprocessing of the data 
 
@@ -69,7 +68,6 @@ end
 
 fprintf('Number of components: %i \n', numb_comp)
 
-
 %% 
 % creating train_data_red as the reduced-dimension representation of the data
 train_data_red=coeff(:,1:numb_comp)'*train_data_t;
@@ -85,13 +83,22 @@ train_data_app=coeff(:,1:numb_comp)*train_data_red;
 close all
 clc
 
-% inputs  = double(train_data_tc);
-inputs  = train_data_app;
+inputs  = train_data_t;
+%inputs  = train_data_tc;
+%inputs  = train_data_red;
 targets = Targets;
 
+[pn, ps1]    = mapstd(inputs);
+[inputs,ps2] = processpca(pn,0.001);
+
+
+%% 
+
 % Create a Pattern Recognition Network
-hiddenLayerSize = 10;
+%hiddenLayerSize = [l1 l2];
+hiddenLayerSize = 100;
 net = patternnet(hiddenLayerSize);
+%net = feedforwardnet(hiddenLayerSize);
 
 % Set up Division of Data for Training, Validation, Testing
 net.divideParam.trainRatio = 70/100;
@@ -99,32 +106,35 @@ net.divideParam.valRatio = 15/100;
 net.divideParam.testRatio = 15/100;
 
 % % Performance function
-%net.performFcn = 'mse';
-net.performFcn = 'crossentropy';
-% net.performFcn = 'sse'; %Sum squared error performance function
+net.performFcn = 'mse';
+%net.performFcn = 'crossentropy';
+%net.performFcn = 'sse'; %Sum squared error performance function
 %net.performFcn = 'sae';  %Sum absolute error performance function
 
+%net.performParam.regularization = 0.01;
 
 % % Transfer functions
 %net.layers{1}.transferFcn = 'tansig';
 %net.layers{1}.transferFcn = 'logsig';
 %net.layers{2}.transferFcn = 'purelin';
+%net.layers{2}.transferFcn = 'tansig';
 %net.layers{2}.transferFcn = 'softmax';
 
 % % Train function 
 %net.trainFcn = 'trainrp';
 net.trainFcn = 'trainscg';
 %net.trainFcn = 'trainlm'; % Levenberg-Marquardt
+%net.trainFcn = 'trainbfg';
 
 % % Train parameters trainscg
-net.trainParam.max_fail = 10;          % default 6
-%net.trainParam.min_grad = 1e-5;        % default 1e-6
+net.trainParam.max_fail = 100;            % default 6
+net.trainParam.min_grad = 1e-5;          % default 1e-6
 %net.trainParam.lambda=5.0e-7;           % default 5.0e-7
 %net.trainParam.sigma=5.0e-1;            % default 5.0e-5
 %net.trainParam.goal;                    % default 0
 
 % % Tran parameters trainrp
-%net.trainParam.lr=0.1;                         % default 0.01
+%net.trainParam.lr=0.5;                         % default 0.01
 %net.trainParam.delt_inc=1.2;                 % default 1.2
 %net.trainParam.delt_dec=0.5;                 % default 0.5
 %net.trainParam.delta0=0.07;                  % default 0.07
@@ -139,11 +149,11 @@ net = init(net);
 % Test the Network
 outputs = trained_net(inputs);
 errors = gsubtract(targets, outputs);
-performance = perform(trained_net, targets,outputs);
+performance = perform(trained_net, targets, outputs);
 fprintf('Network performance  :%4.2f \n', performance)
 
 % View the Network
-view(net);
+view(trained_net);
 
 % Print Percentage
 [ct, cmt] = confusion(targets(:,stats.testInd), outputs(:,stats.testInd));
@@ -154,22 +164,18 @@ fprintf('Test  Correct Class  :%4.2f%%   \n'  , 100*(1-ct));
 fprintf('Total Correct Class  :%4.2f%%   \n'  , 100*(1-c));
 %fprintf('Total Incorrect Class:%4.2f%%   \n'  , 100*c);
 
+fprintf('Test best performance:%4.2f%%   \n'  , stats.best_tperf);
+
 % Plot the confusion matrix
-figure;plotconfusion(targets(:,stats.testInd),  outputs(:,stats.testInd),  'Test', ...
-                      targets, outputs, 'Total')
-
-% figure;plotconfusion(targets(:,stats.trainInd), outputs(:,stats.trainInd), 'Main', ...
-%               targets(:,stats.valInd),   outputs(:,stats.valInd),   'Validation', ...
-%               targets(:,stats.testInd),  outputs(:,stats.testInd),  'Test', ...
-%               targets, outputs, 'Total');
-
+figure;plotconfusion(targets(:,stats.testInd),  outputs(:,stats.testInd),  'Test')
+                      %targets, outputs, 'Total')
 
 % Plot the performance on linear scale
 figure;             % Create a new figure.
 ax = axes;          % Get a handle to the figure's axes
 hold on;            % Set the figure to not overwrite old plots.
 grid on;            % Turn on the grid.
-plot(ax, stats.perf)
+plot(ax, stats.tperf)
 
 % 
 classes = vec2ind(outputs);
@@ -181,6 +187,13 @@ classes = vec2ind(outputs);
 % figure, plotconfusion(targets,outputs)
 % figure, ploterrhist(errors)
 
+
+%% Equation for number of neurons in two layers
+N = size(inputs,1);
+m = 10;
+
+l1 = round(sqrt(m+2)*N + 2*sqrt(N/(m+2)));
+l2 = round(m*sqrt(N/(m+2)));
 
 %% Reconstruct image - check that the data is correct after transformation.
 
