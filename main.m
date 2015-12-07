@@ -54,6 +54,7 @@ train_data_t_means=mean(train_data_t);
 
 train_data_tc=bsxfun(@minus,train_data_t,train_data_t_means);
 
+%%
 % performing PCA 
 [coeff,score,eigenvalues] = pca(train_data_tc');
 
@@ -72,7 +73,6 @@ fprintf('Number of components: %i \n', numb_comp)
 % creating train_data_red as the reduced-dimension representation of the data
 train_data_red=coeff(:,1:numb_comp)'*train_data_t;
 
-%%
 % projecting the reduced images back to the full-dimensional input space
 % for comparing the images
 train_data_app=coeff(:,1:numb_comp)*train_data_red;
@@ -88,15 +88,14 @@ inputs  = train_data_t;
 %inputs  = train_data_red;
 targets = Targets;
 
-[pn, ps1]    = mapstd(inputs);
-[inputs,ps2] = processpca(pn,0.001);
+[pn, ps1]    = mapstd(inputs); % standardizing 
+[inputs,ps2] = processpca(pn,0.001); % uncorrelate every row, drop rows with low variation
 
 
 %% 
-
 % Create a Pattern Recognition Network
 %hiddenLayerSize = [l1 l2];
-hiddenLayerSize = 100;
+hiddenLayerSize = 20;
 net = patternnet(hiddenLayerSize);
 %net = feedforwardnet(hiddenLayerSize);
 
@@ -106,8 +105,8 @@ net.divideParam.valRatio = 15/100;
 net.divideParam.testRatio = 15/100;
 
 % % Performance function
-net.performFcn = 'mse';
-%net.performFcn = 'crossentropy';
+% net.performFcn = 'mse';
+net.performFcn = 'crossentropy';
 %net.performFcn = 'sse'; %Sum squared error performance function
 %net.performFcn = 'sae';  %Sum absolute error performance function
 
@@ -129,7 +128,7 @@ net.trainFcn = 'trainscg';
 % % Train parameters trainscg
 net.trainParam.max_fail = 100;            % default 6
 net.trainParam.min_grad = 1e-5;          % default 1e-6
-%net.trainParam.lambda=5.0e-7;           % default 5.0e-7
+% net.trainParam.lambda= 1;           % default 5.0e-7
 %net.trainParam.sigma=5.0e-1;            % default 5.0e-5
 %net.trainParam.goal;                    % default 0
 
@@ -143,18 +142,41 @@ net.trainParam.min_grad = 1e-5;          % default 1e-6
 % Initialize the network
 net = init(net);
 
+n=4; % <--- how many different networks should be created? 
+
+results=double.empty; % to save outputs 
+performance=double.empty; % to save the performance 
+testIndezes=int8.empty; % to save the instances used for testing 
+confusions=double.empty; % to save the fraction of misclassified samples
+
+for i=1:n
 % Train the Network
 [trained_net, stats] = train(net, inputs, targets);
-
 % Test the Network
 outputs = trained_net(inputs);
-errors = gsubtract(targets, outputs);
-performance = perform(trained_net, targets, outputs);
-fprintf('Network performance  :%4.2f \n', performance)
+results=cat(1,results,outputs);    
+% errors = gsubtract(targets, outputs);
+% performance = perform(trained_net, targets, outputs);
+performance = cat(1,performance,perform(trained_net, targets, outputs));
+confusions = cat(1,confusions,confusion(targets(:,stats.testInd), outputs(:,stats.testInd)));
+testIndezes=cat(1,testIndezes,stats.testInd); 
+end
+
+% calculating the average performance of the ANNs 
+fprintf('Results over all networks: \n')
+fprintf('Average network performance: %4.2f \n', mean(performance))
+fprintf('Average Test Correct Class: %4.2f%%  \n' , 100*(1-mean(confusions)))
+fprintf('Best: %4.2f%%  \n' , 100*(1-min(confusions)))
+fprintf('Worst: %4.2f%%  \n' , 100*(1-max(confusions)))
 
 % View the Network
 view(trained_net);
 
+% plot confusion table for the last network 
+% plotconfusion(targets,outputs, 'Overall')
+% plotconfusion(targets(:,stats.testInd),outputs(:,stats.testInd),'Test')
+
+%%
 % Print Percentage
 [ct, cmt] = confusion(targets(:,stats.testInd), outputs(:,stats.testInd));
 fprintf('Test  Correct Class  :%4.2f%%   \n'  , 100*(1-ct));
@@ -167,6 +189,7 @@ fprintf('Total Correct Class  :%4.2f%%   \n'  , 100*(1-c));
 fprintf('Test best performance:%4.2f%%   \n'  , stats.best_tperf);
 
 % Plot the confusion matrix
+% plotconfusion(targets,outputs, 'Overall', targets(:,stats.testInd),outputs(:,stats.testInd),'test')
 figure;plotconfusion(targets(:,stats.testInd),  outputs(:,stats.testInd),  'Test')
                       %targets, outputs, 'Total')
 
