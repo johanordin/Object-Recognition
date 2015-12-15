@@ -12,18 +12,18 @@ clc
 load(strcat('cifar-10-batches-mat/', 'data_batch_1.mat'));
 data1 = double(data);
 labels1 = double(labels);
-load(strcat('cifar-10-batches-mat/', 'data_batch_2.mat'));
-data2 = double(data);
-labels2 = double(labels);
-load(strcat('cifar-10-batches-mat/', 'data_batch_3.mat'));
-data3 = double(data);
-labels3 = double(labels);
-load(strcat('cifar-10-batches-mat/', 'data_batch_4.mat'));
-data4 = double(data);
-labels4 = double(labels);
-load(strcat('cifar-10-batches-mat/', 'data_batch_5.mat'));
-data5 = double(data);
-labels5 = double(labels);
+% load(strcat('cifar-10-batches-mat/', 'data_batch_2.mat'));
+% data2 = double(data);
+% labels2 = double(labels);
+% load(strcat('cifar-10-batches-mat/', 'data_batch_3.mat'));
+% data3 = double(data);
+% labels3 = double(labels);
+% load(strcat('cifar-10-batches-mat/', 'data_batch_4.mat'));
+% data4 = double(data);
+% labels4 = double(labels);
+% load(strcat('cifar-10-batches-mat/', 'data_batch_5.mat'));
+% data5 = double(data);
+% labels5 = double(labels);
 %train_data = [data1; data2; data3; data4; data5];
 %train_labels = [labels1; labels2; labels3; labels4; labels5]; 
 
@@ -36,8 +36,7 @@ load(strcat('cifar-10-batches-mat/', 'test_batch.mat'));
 test_data = double(data');
 test_labels = double(labels');
 
-
-%% Create target matrix for the training data for the Matlab nprtool
+% Create target matrix for the training data for the Matlab nprtool
 Targets=zeros(10, size(train_data,1));
 
 for i = 1:size(train_data,1)
@@ -45,16 +44,119 @@ for i = 1:size(train_data,1)
    Targets(j, i)=1;
 end
 
+%% Preprocessing of the images
+
+%% Convert to dataset to rgb images
+%train_data=train_data;
+train_data_int = uint8(train_data);
+R=train_data_int(:,1:1024);
+G=train_data_int(:,1025:2048);
+B=train_data_int(:,2049:3072);
+
+for i=1:10000
+    img_org(:,:,1,i)=reshape(R(i,:),32,32);
+    img_org(:,:,2,i)=reshape(G(i,:),32,32);
+    img_org(:,:,3,i)=reshape(B(i,:),32,32);
+end
+class(img_org)% check uint8, no data loss
+
+%% Process images
+kernel = fspecial('prewitt');
+for i=1:10000
+%     edges = imfilter(img_org(:,:,:,i), kernel);
+%     brighter = img_org(:,:,:,i) + edges;
+    for j=1:size(img_org,3)
+%        denoised(:,:,j,i) = medfilt2(img_org(:,:,j,i),[5,5]);
+        adjusted(:,:,j,i) = imadjust(img_org(:,:,j,i)); 
+    end
+end
+%% Plot 
+figure;
+subplot(1,2,1),imshow(uint8(img_org(:,:,:,10000-5))),title('Original RGB image')
+subplot(1,2,2),imshow(uint8(adjusted(:,:,:,10000-5))),title('Adjusted contrast RGB image')
+
+%% Plot
+figure;
+subplot(2,2,1),imshow(uint8(img_org(:,:,:,10000-5))), title('Original image');
+subplot(2,2,2),imshow(uint8(denoised(:,:,:,10000-5))),title('Median filter image');
+subplot(2,2,3),imshow(uint8(img_org(:,:,:,10000-10))), title('Original image');
+subplot(2,2,4),imshow(uint8(denoised(:,:,:,10000-10))),title('Median filter image');
+
+%% Convert rgb images back to original data representation.
+train_d = train_data;
+denoised=adjusted;
+for i=1:10000
+        red_ch = denoised(:,:,1,i);
+        green_ch = denoised(:,:,2,i);
+        blue_ch = denoised(:,:,3,i);
+        red_ch_lin = red_ch(:)';
+        green_ch_lin = green_ch(:)';
+        blue_ch_lin = blue_ch(:)';
+        train_d(i,:) = [red_ch_lin,red_ch_lin,red_ch_lin];
+end
+
+%% Single image - preprocessing test
+
+%one image
+% R=train_data(1,1:1024);
+% G=train_data(1,1025:2048);
+% B=train_data(1,2049:3072);
+% img_org(:,:,1)=reshape(R,32,32);
+% img_org(:,:,2)=reshape(G,32,32);
+% img_org(:,:,3)=reshape(B,32,32);
+% ---------------------------------
+% enhancing the edges in our images
+lg = fspecial('log');
+c2 = imfilter(img_org,lg);
+figure;
+subplot(1,2,1),imshow(uint8(img_org)),title('Original image');
+subplot(1,2,2),imshow(uint8(c2)),title('Color LoG result');
+
+%img_org = c2;
+% ---------------------------------
+% Brighten up the lights
+% amplify the lights in our image by adding the result of the edge enhancement filter to the original image
+kernel = fspecial('prewitt');
+edges = imfilter(img_org, kernel);
+brighter = img_org + edges;
+figure;
+subplot(1,2,1),imshow(uint8(img_org)), title('Original image');
+subplot(1,2,2),imshow(uint8(brighter)),title('Brightened image');
+
+img_org = brighter;
+% ---------------------------------
+% contrast enhancement 
+% This results in a smoother transformation that mostly enhances useful details.
+for i=1:size(img_org,3)
+    adjusted(:,:,i) = imadjust(img_org(:,:,i)); 
+end
+figure;
+subplot(1,2,1),imshow(uint8(img_org)),title('Original RGB image')
+subplot(1,2,2),imshow(uint8(adjusted)),title('Adjusted contrast RGB image')
+
+img_org = adjusted;
+% ---------------------------------
+% remove noise with median filter
+% This difference causes the process of median filtering to be less sensitive to outliers
+for i=1:size(img_org,3)
+    denoised(:,:,i) = medfilt2(img_org(:,:,i),[5,5]);
+end
+figure;
+subplot(1,2,1),imshow(uint8(img_org)),title('Original RGB image')
+subplot(1,2,2),imshow(uint8(denoised)),title('Median filter RGB image')
+
+
 %% Preprocessing of the data 
 
+%% Centering the data
 % centering the data (saving the means to apply it on the test data)
 % images still stored row-wise
-train_data_t=train_data';
+train_data_t=train_data';   % train_data_t <==> img_column, d*n (d=dimension, n=samples)
 train_data_t_means=mean(train_data_t);
 
-train_data_tc=bsxfun(@minus,train_data_t,train_data_t_means);
+train_data_tc=bsxfun(@minus, train_data_t, train_data_t_means);
 
-%%
+%% Principal Component Analysis
 % performing PCA 
 [coeff,score,eigenvalues] = pca(train_data_tc');
 
@@ -69,7 +171,7 @@ end
 
 fprintf('Number of components: %i \n', numb_comp)
 
-%% 
+%% Reduce dimensions
 % creating train_data_red as the reduced-dimension representation of the data
 train_data_red=coeff(:,1:numb_comp)'*train_data_t;
 
@@ -77,13 +179,29 @@ train_data_red=coeff(:,1:numb_comp)'*train_data_t;
 % for comparing the images
 train_data_app=coeff(:,1:numb_comp)*train_data_red;
 
-%% 
+%% Whitening transformation
+n_samples = size(train_data_tc,2); %10000
 
+covar_matrix = (train_data_tc*train_data_tc')*(1/(n_samples-1));
+%imagesc(covar_matrix) % check if this was done correct
+
+[V,D]=eig(covar_matrix);
+
+train_data_tc_rot=V'*train_data_tc;
+
+eps = 0.1;
+train_data_w = diag(1./sqrt(diag(D) + eps )) * train_data_tc_rot;
+
+AC = cov(train_data_w);
+
+
+%%
 % close all plots windows
 close all
 clc
 
-inputs  = train_data_t;
+inputs = train_d';
+%inputs  = train_data_w;
 %inputs  = train_data_tc;
 %inputs  = train_data_red;
 targets = Targets;
@@ -95,7 +213,7 @@ targets = Targets;
 %% 
 % Create a Pattern Recognition Network
 %hiddenLayerSize = [l1 l2];
-hiddenLayerSize = 100;
+hiddenLayerSize = 50;
 net = patternnet(hiddenLayerSize);
 %net = feedforwardnet(hiddenLayerSize);
 
@@ -121,15 +239,16 @@ net.performFcn = 'crossentropy';
 
 % % Train function 
 %net.trainFcn = 'trainrp';
-net.trainFcn = 'traingdx'  % Gradient descent with momentum and adaptive learning rate backpropagation
+%net.trainFcn = 'traingdx'  % Gradient descent with momentum and adaptive learning rate backpropagation
 %net.trainFcn = 'traingdm'
+net.trainFcn = 'traingd';
 %net.trainFcn = 'trainscg';
 %net.trainFcn = 'trainlm'; % Levenberg-Marquardt
 %net.trainFcn = 'trainbfg';
 
 % % Train parameters trainscg
-net.trainParam.max_fail = 1000;            % default 6
-net.trainParam.min_grad = 1e-5;          % default 1e-6
+net.trainParam.max_fail = 50;            % default 6
+%net.trainParam.min_grad = 1e-5;          % default 1e-6
 % net.trainParam.lambda= 1;           % default 5.0e-7
 %net.trainParam.sigma=5.0e-1;            % default 5.0e-5
 %net.trainParam.goal;                    % default 0
@@ -142,10 +261,9 @@ net.trainParam.min_grad = 1e-5;          % default 1e-6
 %net.trainParam.deltamax=50;                  % default 50
 
 % Train parameters traingdx
-net.trainParam.lr=0.3;   %default 	0.01
+net.trainParam.lr=5;   %default 	0.01
 net.trainParam.mc= 0.90;	  %Momentum constant 0.9
 net.trainParam.epochs = 4000;
-
 
 % Initialize the network
 net = init(net);
