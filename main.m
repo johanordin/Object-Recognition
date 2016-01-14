@@ -61,19 +61,17 @@ end
 class(img_org)% check uint8, no data loss
 
 %% Process images
-kernel = fspecial('prewitt');
 for i=1:10000
-%     edges = imfilter(img_org(:,:,:,i), kernel);
-%     brighter = img_org(:,:,:,i) + edges;
     for j=1:size(img_org,3)
-%        denoised(:,:,j,i) = medfilt2(img_org(:,:,j,i),[5,5]);
-        adjusted(:,:,j,i) = imadjust(img_org(:,:,j,i)); 
+        %denoised(:,:,j,i) = medfilt2(img_org(:,:,j,i),[3,3]);
+        adjusted(:,:,j,i) = histeq(img_org(:,:,j,i));
+        %adjusted(:,:,j,i) = imadjust(denoised(:,:,j,i)); 
     end
 end
 %% Plot 
 figure;
-subplot(1,2,1),imshow(uint8(img_org(:,:,:,10000-5))),title('Original RGB image')
-subplot(1,2,2),imshow(uint8(adjusted(:,:,:,10000-5))),title('Adjusted contrast RGB image')
+subplot(1,2,1),imshow(uint8(img_org(:,:,:,8888))),title('Original RGB image')
+subplot(1,2,2),imshow(uint8(adjusted(:,:,:,8888))),title('Adjusted contrast RGB image')
 
 %% Plot
 figure;
@@ -95,59 +93,7 @@ for i=1:10000
         train_d(i,:) = [red_ch_lin,red_ch_lin,red_ch_lin];
 end
 
-%% Single image - preprocessing test
-
-%one image
-% R=train_data(1,1:1024);
-% G=train_data(1,1025:2048);
-% B=train_data(1,2049:3072);
-% img_org(:,:,1)=reshape(R,32,32);
-% img_org(:,:,2)=reshape(G,32,32);
-% img_org(:,:,3)=reshape(B,32,32);
-% ---------------------------------
-% enhancing the edges in our images
-lg = fspecial('log');
-c2 = imfilter(img_org,lg);
-figure;
-subplot(1,2,1),imshow(uint8(img_org)),title('Original image');
-subplot(1,2,2),imshow(uint8(c2)),title('Color LoG result');
-
-%img_org = c2;
-% ---------------------------------
-% Brighten up the lights
-% amplify the lights in our image by adding the result of the edge enhancement filter to the original image
-kernel = fspecial('prewitt');
-edges = imfilter(img_org, kernel);
-brighter = img_org + edges;
-figure;
-subplot(1,2,1),imshow(uint8(img_org)), title('Original image');
-subplot(1,2,2),imshow(uint8(brighter)),title('Brightened image');
-
-img_org = brighter;
-% ---------------------------------
-% contrast enhancement 
-% This results in a smoother transformation that mostly enhances useful details.
-for i=1:size(img_org,3)
-    adjusted(:,:,i) = imadjust(img_org(:,:,i)); 
-end
-figure;
-subplot(1,2,1),imshow(uint8(img_org)),title('Original RGB image')
-subplot(1,2,2),imshow(uint8(adjusted)),title('Adjusted contrast RGB image')
-
-img_org = adjusted;
-% ---------------------------------
-% remove noise with median filter
-% This difference causes the process of median filtering to be less sensitive to outliers
-for i=1:size(img_org,3)
-    denoised(:,:,i) = medfilt2(img_org(:,:,i),[5,5]);
-end
-figure;
-subplot(1,2,1),imshow(uint8(img_org)),title('Original RGB image')
-subplot(1,2,2),imshow(uint8(denoised)),title('Median filter RGB image')
-
-
 %% Preprocessing of the data 
-
 %% Centering the data
 % centering the data (saving the means to apply it on the test data)
 % images still stored row-wise
@@ -158,7 +104,8 @@ train_data_tc=bsxfun(@minus, train_data_t, train_data_t_means);
 
 %% Principal Component Analysis
 % performing PCA 
-[coeff,score,eigenvalues] = pca(train_data_tc');
+%[coeff, score, eigenvalues] = pca(train_data_tc');
+[coeff, score, eigenvalues] = pca(train_data);
 
 % determing the number of components to keep to maintan >99% of variation
 var_sum=sum(eigenvalues);
@@ -170,7 +117,6 @@ while var_kept<0.99
 end
 
 fprintf('Number of components: %i \n', numb_comp)
-
 %% Reduce dimensions
 % creating train_data_red as the reduced-dimension representation of the data
 train_data_red=coeff(:,1:numb_comp)'*train_data_t;
@@ -186,15 +132,12 @@ covar_matrix = (train_data_tc*train_data_tc')*(1/(n_samples-1));
 %imagesc(covar_matrix) % check if this was done correct
 
 [V,D]=eig(covar_matrix);
-
 train_data_tc_rot=V'*train_data_tc;
 
 eps = 0.1;
 train_data_w = diag(1./sqrt(diag(D) + eps )) * train_data_tc_rot;
 
 AC = cov(train_data_w);
-
-
 %%
 % close all plots windows
 close all
@@ -206,14 +149,12 @@ inputs = train_d';
 %inputs  = train_data_red;
 targets = Targets;
 
-[pn, ps1]    = mapstd(inputs); % standardizing 
-[inputs,ps2] = processpca(pn,0.001); % uncorrelate every row, drop rows with low variation
-
-
+%[pn, ps1]    = mapstd(inputs); % standardizing 
+%[inputs,ps2] = processpca(pn,0.001); % uncorrelate every row, drop rows with low variation
 %% 
 % Create a Pattern Recognition Network
 %hiddenLayerSize = [l1 l2];
-hiddenLayerSize = 50;
+hiddenLayerSize = 20;
 net = patternnet(hiddenLayerSize);
 %net = feedforwardnet(hiddenLayerSize);
 
@@ -225,8 +166,6 @@ net.divideParam.testRatio = 15/100;
 % % Performance function
 % net.performFcn = 'mse';
 net.performFcn = 'crossentropy';
-%net.performFcn = 'sse'; %Sum squared error performance function
-%net.performFcn = 'sae';  %Sum absolute error performance function
 
 %net.performParam.regularization = 0.01;
 
@@ -262,13 +201,13 @@ net.trainParam.max_fail = 50;            % default 6
 
 % Train parameters traingdx
 net.trainParam.lr=5;   %default 	0.01
-net.trainParam.mc= 0.90;	  %Momentum constant 0.9
+% net.trainParam.mc= 0.90;	  %Momentum constant 0.9
 net.trainParam.epochs = 4000;
 
 % Initialize the network
 net = init(net);
 
-n=1; % <--- how many different networks should be created? 
+n=5; % <--- how many different networks should be created? 
 
 results     = double.empty; % to save outputs 
 performance = double.empty; % to save the performance 
