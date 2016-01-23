@@ -1,5 +1,5 @@
 %% Notice: 
-% 2the data files("data_batch_1.mat", etc.) have to be in a folder called
+% the data files("data_batch_1.mat", etc.) have to be in a folder called
 % "cifar-10-batches-mat" in the location of this MATLAB script 
 
 %% Import the files
@@ -109,10 +109,12 @@ train_data_red=coeff(:,1:numb_comp)'*train_data_std;
 % depending on what data you want to use as input data uncomment the
 % correspondig line: 
 
-% inputs = train_data_tc; % centered data 
+% inputs = train_data_tc;  % centered data 
 % inputs = train_data_std; % standardized data 
-% inputs = score'; % principal components from the pca method 
-inputs = train_data_ppca; % components from processpca, number of components depending on the variation stated at point 3.2 
+% inputs = score';         % principal components from the pca method 
+% inputs = train_img';        % image processed data
+% inputs = train_w;           % Whitening data
+inputs = train_data_ppca;  % components from processpca, number of components depending on the variation stated at point 3.2 
 
 targets = Targets;
 
@@ -205,97 +207,104 @@ test_data_trans = processpca('apply',test_data_std,setting_processpca_004);%proc
 [val ind]=max(outputs,[],1); % highest class probability and position per instance
 ind=ind-1; % position - 1 = class 
 classification_rate=sum(ind == test_labels)/length(ind) % Classification rate 
+%% Notice 2: This is the code for image processing that was implemented but
+%            not used in the end.
+%            This can be tested if you uncomment the rows until next notice
+%            Then you also need to uncomment train_img at row 115.
+% 
+% %% Preprocessing - methods applied on images 
+% %% Convert to dataset to rgb images
+% train_data_int = uint8(train_data);
+% R=train_data_int(:,1:1024);
+% G=train_data_int(:,1025:2048);
+% B=train_data_int(:,2049:3072);
+% 
+% for i=1:10000
+%     img_org(:,:,1,i)=reshape(R(i,:),32,32);
+%     img_org(:,:,2,i)=reshape(G(i,:),32,32);
+%     img_org(:,:,3,i)=reshape(B(i,:),32,32);
+% end
+% class(img_org)% check uint8, no data loss
+% 
+% %% Process images
+% for i=1:10000
+%     for j=1:size(img_org,3)
+%         %denoised(:,:,j,i) = medfilt2(img_org(:,:,j,i),[3,3]); % only median filter
+%         adjusted(:,:,j,i) = histeq(img_org(:,:,j,i));          % only histogram equalization
+%         %adjusted(:,:,j,i) = histeq(denoised(:,:,j,i));        % both
+%     end
+% end
+% %% Plot - Show contrast normalization results visually
+% figure;
+% subplot(1,2,1),imshow(uint8(img_org(:,:,:,8888))),title('Original RGB image')
+% subplot(1,2,2),imshow(uint8(adjusted(:,:,:,8888))),title('Adjusted contrast RGB image')
+% 
+% %% Plot -Show median filter results visually
+% figure;
+% subplot(2,2,1),imshow(uint8(img_org(:,:,:,10000-5))), title('Original image');
+% subplot(2,2,2),imshow(uint8(denoised(:,:,:,10000-5))),title('Median filter image');
+% subplot(2,2,3),imshow(uint8(img_org(:,:,:,10000-10))), title('Original image');
+% subplot(2,2,4),imshow(uint8(denoised(:,:,:,10000-10))),title('Median filter image');
+% 
+% %% Convert rgb images back to original data representation.
+% train_img = train_data;
+% denoised=adjusted;
+% for i=1:10000
+%         red_ch = denoised(:,:,1,i);
+%         green_ch = denoised(:,:,2,i);
+%         blue_ch = denoised(:,:,3,i);
+%         red_ch_lin = red_ch(:)';
+%         green_ch_lin = green_ch(:)';
+%         blue_ch_lin = blue_ch(:)';
+%         train_img(i,:) = [red_ch_lin,red_ch_lin,red_ch_lin];
+% end
 
-
-
-%% Preprocessing - methods applied on images 
-%% Convert to dataset to rgb images
-%train_data=train_data;
-train_data_int = uint8(train_data);
-R=train_data_int(:,1:1024);
-G=train_data_int(:,1025:2048);
-B=train_data_int(:,2049:3072);
-
-for i=1:10000
-    img_org(:,:,1,i)=reshape(R(i,:),32,32);
-    img_org(:,:,2,i)=reshape(G(i,:),32,32);
-    img_org(:,:,3,i)=reshape(B(i,:),32,32);
-end
-class(img_org)% check uint8, no data loss
-
-%% Process images
-for i=1:10000
-    for j=1:size(img_org,3)
-        %denoised(:,:,j,i) = medfilt2(img_org(:,:,j,i),[3,3]);
-        adjusted(:,:,j,i) = histeq(img_org(:,:,j,i));
-        %adjusted(:,:,j,i) = imadjust(denoised(:,:,j,i)); 
-    end
-end
-%% Plot 
-figure;
-subplot(1,2,1),imshow(uint8(img_org(:,:,:,8888))),title('Original RGB image')
-subplot(1,2,2),imshow(uint8(adjusted(:,:,:,8888))),title('Adjusted contrast RGB image')
-
-%% Plot
-figure;
-subplot(2,2,1),imshow(uint8(img_org(:,:,:,10000-5))), title('Original image');
-subplot(2,2,2),imshow(uint8(denoised(:,:,:,10000-5))),title('Median filter image');
-subplot(2,2,3),imshow(uint8(img_org(:,:,:,10000-10))), title('Original image');
-subplot(2,2,4),imshow(uint8(denoised(:,:,:,10000-10))),title('Median filter image');
-
-%% Convert rgb images back to original data representation.
-train_d = train_data;
-denoised=adjusted;
-for i=1:10000
-        red_ch = denoised(:,:,1,i);
-        green_ch = denoised(:,:,2,i);
-        blue_ch = denoised(:,:,3,i);
-        red_ch_lin = red_ch(:)';
-        green_ch_lin = green_ch(:)';
-        blue_ch_lin = blue_ch(:)';
-        train_d(i,:) = [red_ch_lin,red_ch_lin,red_ch_lin];
-end
-
-%% Whitening transformation
-n_samples = size(train_data_tc,2); %10000
-
-covar_matrix = (train_data_tc*train_data_tc')*(1/(n_samples-1));
-%imagesc(covar_matrix) % check if this was done correct
-
-[V,D]=eig(covar_matrix);
-train_data_tc_rot=V'*train_data_tc;
-
-eps = 0.1;
-train_data_w = diag(1./sqrt(diag(D) + eps )) * train_data_tc_rot;
-
-AC = cov(train_data_w);
-
-%% Reconstruct images from the data
-% used to check if methods have been correctly applied to the data
-
-% Get R, G, and B from the first ROW of data.
-% R=train_data(1,1:1024);
-% G=train_data(1,1025:2048);
-% B=train_data(1,2049:3072);
-
-% Get R, G, and B from the first ROW of the reduced dimensional data.
-R=train_data_app(1:1024,1);
-G=train_data_app(1025:2048,1);
-B=train_data_app(2049:3072,1);
-
-% Get R, G, and B from the first COLUMN of centered data.
-R1=train_data_tc(1:1024, 1);
-G1=train_data_tc(1025:2048, 1);
-B1=train_data_tc(2049:3072, 1);
- 
-% Create a 32x32 color image.
-image1(:,:,1)=reshape(R,32,32);
-image1(:,:,2)=reshape(G,32,32);
-image1(:,:,3)=reshape(B,32,32);
-image2(:,:,1)=reshape(R1,32,32);
-image2(:,:,2)=reshape(G1,32,32);
-image2(:,:,3)=reshape(B1,32,32);
-% Display the color image.
-imshow(image1);figure;
-imshow(image2)
+%% Notice 3: This is the code of the Whitening transformation that we tried
+%            to implement but not used in the end.
+%            This can be tested if you uncomment the rows until next notice
+%            Then you also need to uncomment train_w at row 116.
+% %% Whitening transformation
+% n_samples = size(train_data_tc,2); %10000
+% 
+% covar_matrix = (train_data_tc*train_data_tc')*(1/(n_samples-1));
+% %imagesc(covar_matrix) % check if this was done correct
+% 
+% [V,D]=eig(covar_matrix);
+% train_data_tc_rot=V'*train_data_tc;
+% 
+% eps = 0.1;
+% train_data_w = diag(1./sqrt(diag(D) + eps )) * train_data_tc_rot;
+% %AC = cov(train_data_w);
+% 
+%% Notice 4: This is the code for translating the images in the data set
+%            to the image domain and look at them visually.
+%          
+% %% Reconstruct images from the data
+% % used to check if methods have been correctly applied to the data
+% 
+% % Get R, G, and B from the first ROW of data.
+% % R=train_data(1,1:1024);
+% % G=train_data(1,1025:2048);
+% % B=train_data(1,2049:3072);
+% 
+% % Get R, G, and B from the first ROW of the reduced dimensional data.
+% R=train_data_app(1:1024,1);
+% G=train_data_app(1025:2048,1);
+% B=train_data_app(2049:3072,1);
+% 
+% % Get R, G, and B from the first COLUMN of centered data.
+% R1=train_data_tc(1:1024, 1);
+% G1=train_data_tc(1025:2048, 1);
+% B1=train_data_tc(2049:3072, 1);
+%  
+% % Create a 32x32 color image.
+% image1(:,:,1)=reshape(R,32,32);
+% image1(:,:,2)=reshape(G,32,32);
+% image1(:,:,3)=reshape(B,32,32);
+% image2(:,:,1)=reshape(R1,32,32);
+% image2(:,:,2)=reshape(G1,32,32);
+% image2(:,:,3)=reshape(B1,32,32);
+% % Display the color image.
+% imshow(image1);figure;
+% imshow(image2)
 
