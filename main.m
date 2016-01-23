@@ -202,11 +202,13 @@ fprintf('Worst: %4.2f%%  \n' , 100*(1-max(confusions)))
 %% Testing the neural network on the test data 
 % preprocessing the test data as the train data: 
 test_data_std = mapstd('apply',test_data,setting_std);% standardization of the data
-test_data_trans = processpca('apply',test_data_std,setting_processpca_004);%processpcaoutputs=trained_net(test_data_trans);% feeding the network with the test data
+% test_data_trans = coeff* test_data_std; % for pca coeff(:,1:XX)' XX:number of principal component to use 
+test_data_trans = processpca('apply',test_data_std,setting_processpca);%processpcaoutputs=trained_net(test_data_trans);% feeding the network with the test data
 
 [val ind]=max(outputs,[],1); % highest class probability and position per instance
 ind=ind-1; % position - 1 = class 
 classification_rate=sum(ind == test_labels)/length(ind) % Classification rate 
+
 %% Notice 2: This is the code for image processing that was implemented but
 %            not used in the end.
 %            This can be tested if you uncomment the rows until next notice
