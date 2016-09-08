@@ -1,3 +1,7 @@
+% 
+% Authors  : Johan Nordin & Sebastian Hagn
+% Course: CI-MAI
+
 %% Notice: 
 % the data files("data_batch_1.mat", etc.) have to be in a folder called
 % "cifar-10-batches-mat" in the location of this MATLAB script 
